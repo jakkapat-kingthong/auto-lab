@@ -1,0 +1,63 @@
+name: ArXiv Daily Digest
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 08:00 Bangkok (UTC+7) ทุกวัน
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Fetch papers (one file per paper)
+        run: python scripts/arxiv_digest.py
+
+      # ─── Commit each paper individually → N commits instead of 1 ───
+      # ทำให้สีกราฟต่างกันแต่ละวัน (วันธรรมดา = เขียวเข้ม, วันหยุด = เขียวอ่อน)
+      - name: Commit each paper individually
+        run: |
+          git config user.email "${{ secrets.GIT_EMAIL }}"
+          git config user.name "${{ secrets.GIT_NAME }}"
+          git pull --rebase origin main
+
+          TODAY=$(date +'%Y-%m-%d')
+          PAPER_DIR="papers/$TODAY"
+
+          if [ ! -d "$PAPER_DIR" ]; then
+            echo "[skip] No papers directory for $TODAY"
+            exit 0
+          fi
+
+          COUNT=0
+          for f in "$PAPER_DIR"/paper-*.md; do
+            [ -f "$f" ] || continue
+            FNAME=$(basename "$f" .md)
+            git add "$f"
+            # ถ้าไม่มีอะไรเพิ่มใหม่ (ไฟล์นั้นมี commit แล้ว) ข้ามไป
+            git diff --staged --quiet && continue
+            git commit -m "feat(papers): $TODAY $FNAME"
+            COUNT=$((COUNT + 1))
+          done
+
+          if [ "$COUNT" -gt 0 ]; then
+            git push origin main
+            echo "[arxiv] Pushed $COUNT individual paper commits"
+          else
+            echo "[skip] All papers already committed"
+          fi

@@ -1,0 +1,24 @@
+name: Keepalive
+
+# ป้องกัน GitHub ปิด scheduled workflows หลัง 60 วันไม่มี activity
+# รันทุกวันอาทิตย์ — ถ้า daily workflows ทำงานปกติ action นี้จะไม่ทำอะไร
+# ถ้า daily workflows หยุดทำงาน action นี้จะ commit เพื่อ reset timer
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'   # ทุกวันอาทิตย์ 07:00 Bangkok (UTC+7)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keepalive
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          time_elapsed: 45   # ถ้าไม่มี commit 45 วัน → สร้าง commit อัตโนมัติ
+          commit_message: "chore: keepalive ping"

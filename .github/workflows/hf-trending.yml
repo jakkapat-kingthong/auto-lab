@@ -1,0 +1,39 @@
+name: HuggingFace Trending
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 09:00 Bangkok (UTC+7) ทุกวัน
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  trending:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Fetch HuggingFace trending
+        run: python scripts/hf_trending.py
+
+      - name: Commit and push
+        run: |
+          git config user.email "${{ secrets.GIT_EMAIL }}"
+          git config user.name "${{ secrets.GIT_NAME }}"
+          git pull --rebase origin main
+          git add models/
+          git diff --staged --quiet && echo "[skip] No changes to commit" && exit 0
+          git commit -m "feat(models): HuggingFace trending $(date +'%Y-%m-%d')"
+          git push origin main
